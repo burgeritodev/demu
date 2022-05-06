@@ -1,0 +1,195 @@
+
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="viewport"
+        content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height">
+
+    <link rel="apple-touch-icon" href="https://ds.44670.org/icon.png">
+    <link rel="preload" href="https://ds.44670.org/audio-worklet.js" as="script">
+    <link href="https://ds.44670.org/dark.css" rel="stylesheet">
+    <title>DS Player</title>
+</head>
+
+<body>
+    <style>
+        html,
+        body {
+            overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            cursor: inherit;
+        }
+
+        body {
+            background-color: black;
+            color: white;
+            padding: 0;
+            margin: 0;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Myriad Set Pro', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+
+        canvas {
+            position: absolute;
+            z-index: 1;
+            image-rendering: pixelated;
+        }
+
+        #msg-layer {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            top: 40vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 3;
+        }
+
+        #vk-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            touch-action: none;
+        }
+
+        #menu {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 4;
+            overflow: hidden scroll;
+            background: rgba(0, 127, 255, 0.5);
+        }
+
+        #menu button {
+            background: transparent;
+        }
+
+        #menu button:active {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        a,
+        a:visited {
+            color: white;
+
+        }
+
+        .vk-round {
+            text-align: center;
+            vertical-align: middle;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+
+        .vk {
+            color: rgba(0, 0, 0, 0.2);
+            background-color: rgba(255, 255, 255, 0.25);
+            position: absolute;
+            z-index: 1;
+            text-align: center;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
+
+        .vk-touched {
+            background-color: rgba(255, 255, 255, 0.75) !important
+        }
+        
+        .link {
+            text-decoration: underline;
+        }
+    </style>
+    <div id="welcome" class="menu">
+        <h1>DS Player</h1>
+        <div id="loading">Loading...</div>
+        <div id="loadrom" hidden>
+            <input id="rom" type="file" hidden>
+            <button style="width:calc(100% - 2em);margin: 1em;" id="btn-choose-file">Choose File (or drag/drop)...</button><br>
+        </div>
+        <p style="color: #888;">
+            This software should not be used to play games you have not legally obtained.<br>
+            This site is in no way associated with any of the vendors of the original game software and hardware.
+            <br>
+        </p>
+        <hr>
+        <p><span id="ver-info"></span><a onclick="whatsNew()" href="#">What's New</a>&nbsp;|&nbsp;<a href="#" onclick="uiSwitchTo('menu')">⚙ Settings...</a></p>
+        <p id="p-sns">
+            <a href="/gba">GBA Player</a>
+        </p>
+        <p>
+            <a href="https://www.patreon.com/posts/63984675">Help</a>&nbsp;|&nbsp;<a href="#" id="a-gamepad">Gamepad Disconnected</a>
+        </p>
+        <div id="pro" style="background-color: #333">
+        </div>
+        <div id="ios-hint" hidden>
+            Due to iOS Safari limitations, you have to add this page to your <b>Home Screen</b> in order to save your game progress.
+            <p style="text-align: center;">⬇⬇</p>
+        </div>
+        <div id="mac-warning" hidden>
+            WARNING:<br>
+            It looks like you are using macOS.<br>
+            Due to macOS Safari <a href="https://webkit.org/tracking-prevention/">limitations</a>, ALL of you save data
+            will be LOST after 7 days of inactivity.<br>
+            For this reason, it is highly recommended to use a different browser. (For example: <a
+                href="https://www.google.com/chrome/">Chrome</a>)
+        </div>
+    </div>
+    <div id="vk-layer" hidden>
+        <div class="vk-rect vk" data-k="menu" id="vk-menu">Menu</div>
+        <div class="vk-rect vk" data-k="l">L</div>
+        <div class="vk-rect vk" data-k="r">R</div>
+        <div class="vk-round vk" data-k="a">A</div>
+        <div class="vk-round vk" data-k="b">B</div>
+        <div class="vk-round vk" data-k="x">X</div>
+        <div class="vk-round vk" data-k="y">Y</div>
+        <div class="vk-rect vk" data-k="select">-</div>
+        <div class="vk-rect vk" data-k="start">+</div>
+        <div class="vk-round vk" data-k="stick" id="vk-stick"></div>
+    </div>
+    <div style="z-index: 2;position: absolute;bottom: 20px;" id="fps"></div>
+    <div id="msg-layer" hidden>
+        <p id="msg-text"></p>
+    </div>
+    <div id="menu" hidden>
+        <button onclick="uiMenuBack()">❮ Back</button>
+        <hr>
+        <input type="checkbox" id="power-save">
+        <label for="power-save">Power-save mode</label><br>
+        <input type="checkbox" id="vk-enabled">
+        <label for="vk-enabled">Virtual keyboard</label><br>
+        <input type="checkbox" id="cfg-mute-sound">
+        <label for="cfg-mute-sound">Mute sound</label><br>
+        <hr>
+        <div id="menu-savegame" hidden>
+            <input type="file" id="restore-file" onchange="uiSaveRestore()" hidden>
+            Save Data: <button onclick="uiSaveBackup()">↓ Export</button>|<button
+                onclick="$id('restore-file').click()">↑ Import</button>
+            <hr>
+        </div>
+    </div>
+    <div id="player" hidden>
+        <canvas id="top" width="256" height="192"></canvas>
+        <canvas id="bottom" width="256" height="192"></canvas>
+    </div>
+    <script src="https://ds.44670.org/localforage.js"></script>
+    <script src="https://ds.44670.org/pako.min.js"></script>
+    <script src="https://ds.44670.org/app.js"></script>
+    <script src="https://ds.44670.org/build/nds.js"></script>
+    <script src="https://ds.44670.org/sw-loader.js"></script>
+</body>
+
+</html>
